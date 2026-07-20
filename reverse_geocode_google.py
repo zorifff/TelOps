@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""Reverse-geocode koordinat Excel memakai Google Maps Geocoding API.
+
+Contoh:
+  set GOOGLE_MAPS_API_KEY=AIza...
+  python reverse_geocode_google.py "raw order 18 jul.xlsx" hasil_alamat.xlsx
+"""
+from __future__ import annotations
+import argparse, os, random, sys, time
+from collections import defaultdict
+from pathlib import Path
+from typing import Any
+import requests
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+
+API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+VILLAGE_TYPES = ("administrative_area_level_4", "sublocality_level_1", "sublocality", "locality")
+
+def normalise_header(value: Any) -> str:
+    return str(value or "").strip().lower().replace("_", "").replace(" ", "")
+
+def column_map(ws) -> dict[str, int]:
+    headers = {normalise_header(c.value): c.column for c in ws[1]}
+    missing = {"bbid", "longitude", "latitude"} - headers.keys()
+    if missing:
+        raise ValueError(f"Header wajib tidak ditemukan: {', '.join(sorted(missing))}")
+    return headers
+
+def component_index(results: list[dict[str, Any]]) -> dict[str, str]:
+    """Mengambil komponen Google, tanpa mengarang wilayah yang tidak ada."""
+    found: dict[str, str] = {}
+    for result in results:
+        for comp in result.get("address_components", []):
+            for kind in comp.get("types", []):
+                found.setdefault(kind, comp.get("long_name", "").strip())
+    return found
+
+def structured_address(results: list[dict[str, Any]]) -> tuple[str, bool, str]:
+    components = component_index(results)
+    village = next((components[t] for t in VILLAGE_TYPES if components.get(t)), "")
+    district = components.get("administrative_area_level_3", "")
+    regency = components.get("administrative_area_level_2", "")
+    province = components.get("administrative_area_level_1", "")
+    parts: list[str] = []
+    if village: parts.append(village)
+    if district: parts.append(f"Kec. {district}")
+    if regency:
+        prefixed = regency.lower().startswith(("kabupaten ", "kota "))
+        label = "Kota" if regency.lower().startswith(("kota ", "city of ")) else "Kabupaten"
+        parts.append(regency if prefixed else f"{label} {regency}")
+    if province: parts.append(province)
+    complete = bool(village and district and regency and province)
+    formatted = results[0].get("formatted_address", "") if results else ""
+    return ", ".join(parts) or formatted, complete, formatted
+
+def google_reverse_geocode(session: requests.Session, lat: float, lng: float, key: str) -> tuple[str, bool, str, str]:
+    params = {"latlng": f"{lat:.8f},{lng:.8f}", "key": key, "language": "id", "region": "id"}
+    last_error = ""
+    for attempt in range(6):
+        try:
+            response = session.get(API_URL, params=params, timeout=30)
+            response.raise_for_status()
+            payload = response.json(); status = payload.get("status", "UNKNOWN_ERROR")
+            if status == "OK" and payload.get("results"):
+                address, complete, formatted = structured_address(payload["results"])
+                return address, complete, formatted, "OK" if complete else "PERLU_VERIFIKASI_KOMPONEN"
+            if status not in {"OVER_QUERY_LIMIT", "UNKNOWN_ERROR"}:
+                detail = payload.get("error_message", "")
+                return "", False, "", f"{status}: {detail}".rstrip(": ")
+            last_error = status
+        except (requests.RequestException, ValueError) as exc:
+            last_error = str(exc)
+        time.sleep(min(30, 1.5 ** attempt) + random.uniform(0, .4))
+    return "", False, "", f"GAGAL_SETELAH_RETRY: {last_error}"
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Reverse geocode Excel melalui Google Maps Geocoding API")
+    parser.add_argument("input", type=Path); parser.add_argument("output", type=Path)
+    parser.add_argument("--delay", type=float, default=.08, help="Jeda antar koordinat unik (detik)")
+    args = parser.parse_args()
+    key = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
+    if not key:
+        print("GOOGLE_MAPS_API_KEY belum diatur. Lihat README_google_geocoding.md.", file=sys.stderr); return 2
+    if not args.input.is_file(): print(f"File sumber tidak ditemukan: {args.input}", file=sys.stderr); return 2
+    if args.output.resolve() == args.input.resolve(): print("Output harus berbeda dari input.", file=sys.stderr); return 2
+    source = load_workbook(args.input, read_only=True, data_only=True)
+    ws = source[source.sheetnames[0]]; cols = column_map(ws)
+    out = Workbook(); result = out.active; result.title = "Hasil"; log = out.create_sheet("Log")
+    result.append(["bb_id", "latitude", "longitude", "alamat"])
+    log.append(["baris_sumber", "bb_id", "latitude", "longitude", "status", "alamat_google", "catatan"])
+    cache: dict[tuple[float, float], tuple[str, bool, str, str]] = {}; session = requests.Session(); counts: defaultdict[str, int] = defaultdict(int)
+    for row_no, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        bb_id, lng_raw, lat_raw = row[cols["bbid"]-1], row[cols["longitude"]-1], row[cols["latitude"]-1]
+        try:
+            lat, lng = float(lat_raw), float(lng_raw)
+            if not (-90 <= lat <= 90 and -180 <= lng <= 180): raise ValueError("di luar rentang koordinat")
+        except (TypeError, ValueError) as exc:
+            result.append([bb_id, lat_raw, lng_raw, ""]); log.append([row_no, bb_id, lat_raw, lng_raw, "KOORDINAT_TIDAK_VALID", "", str(exc)]); counts["KOORDINAT_TIDAK_VALID"] += 1; continue
+        coordinate = (round(lat, 8), round(lng, 8))
+        if coordinate not in cache:
+            cache[coordinate] = google_reverse_geocode(session, lat, lng, key); time.sleep(args.delay)
+        address, complete, google_address, status = cache[coordinate]
+        result.append([bb_id, lat, lng, address]); log.append([row_no, bb_id, lat, lng, status, google_address, "" if complete else "Periksa hasil Google sebelum digunakan sebagai alamat final."])
+        counts[status] += 1
+        if row_no % 50 == 0: print(f"Memproses baris {row_no-1}/{ws.max_row-1}...")
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+    for sheet in (result, log):
+        sheet.freeze_panes = "A2"; sheet.auto_filter.ref = sheet.dimensions
+        for cell in sheet[1]: cell.font = Font(bold=True, color="FFFFFF"); cell.fill = header_fill; cell.alignment = Alignment(horizontal="center")
+    for column, width in {"A":18,"B":14,"C":14,"D":70}.items(): result.column_dimensions[column].width = width
+    for column, width in {"A":14,"B":18,"C":14,"D":14,"E":30,"F":75,"G":50}.items(): log.column_dimensions[column].width = width
+    args.output.parent.mkdir(parents=True, exist_ok=True); out.save(args.output)
+    print(f"Selesai. File dibuat: {args.output}"); print("Ringkasan status:", dict(counts)); return 0
+
+if __name__ == "__main__": raise SystemExit(main())

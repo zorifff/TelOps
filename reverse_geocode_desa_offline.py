@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""Cari alamat administratif dari titik Excel dengan polygon desa/kelurahan.
+
+Tidak menggunakan API maupun jaringan. Data polygon yang dipakai adalah
+shapefile di dalam ZIP ``DESA-KECAMATAN JATENG DIY.zip`` (WGS84 / EPSG:4326).
+
+Contoh:
+  python reverse_geocode_desa_offline.py "raw order 18 jul.xlsx" \
+    "DESA-KECAMATAN JATENG DIY.zip" hasil_alamat.xlsx
+"""
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from io import BytesIO
+from pathlib import Path
+from zipfile import ZipFile
+
+import shapefile
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from shapely.geometry import Point, shape
+from shapely.strtree import STRtree
+
+
+REQUIRED_BOUNDARY_FIELDS = ("PROVINSI", "KAB_KOTA", "KECAMATAN", "DESA_KELUR")
+
+
+def normalise_header(value: object) -> str:
+    return str(value or "").strip().lower().replace("_", "").replace(" ", "")
+
+
+def spreadsheet_columns(ws) -> dict[str, int]:
+    # Pada workbook read-only, sel header yang kosong dapat menjadi EmptyCell
+    # tanpa atribut ``column``. Gunakan posisi enumerasi dan abaikan header kosong.
+    columns = {
+        normalise_header(cell.value): position
+        for position, cell in enumerate(ws[1], start=1)
+        if normalise_header(cell.value)
+    }
+    missing = {"bbid", "longitude", "latitude"} - columns.keys()
+    if missing:
+        raise ValueError("Header wajib tidak ditemukan: " + ", ".join(sorted(missing)))
+    return columns
+
+
+def title_case(value: object) -> str:
+    """Rapikan nilai huruf kapital dari shapefile, tanpa mengubah singkatan."""
+    text = str(value or "").strip()
+    return text.title() if text.isupper() else text
+
+
+def administrative_address(record: dict[str, object]) -> str:
+    """Buat alamat hanya dari atribut polygon yang memuat titik tersebut."""
+    desa = title_case(record["DESA_KELUR"])
+    kecamatan = title_case(record["KECAMATAN"])
+    kab_kota = title_case(record["KAB_KOTA"])
+    provinsi = title_case(record["PROVINSI"])
+    return f"{desa}, Kec. {kecamatan}, {kab_kota}, {provinsi}"
+
+
+def load_boundaries(zip_path: Path):
+    """Baca shapefile ZIP tanpa mengekstrak file ke disk."""
+    with ZipFile(zip_path) as archive:
+        shp_files = [name for name in archive.namelist() if name.lower().endswith(".shp")]
+        if len(shp_files) != 1:
+            raise ValueError("ZIP harus memiliki tepat satu file .shp")
+        stem = shp_files[0][:-4]
+        expected = [stem + suffix for suffix in (".shp", ".shx", ".dbf")]
+        absent = [name for name in expected if name not in archive.namelist()]
+        if absent:
+            raise ValueError("Komponen shapefile tidak lengkap: " + ", ".join(absent))
+        reader = shapefile.Reader(
+            shp=BytesIO(archive.read(stem + ".shp")),
+            shx=BytesIO(archive.read(stem + ".shx")),
+            dbf=BytesIO(archive.read(stem + ".dbf")),
+            encoding="utf-8",
+        )
+        names = [field[0] for field in reader.fields[1:]]
+        missing = set(REQUIRED_BOUNDARY_FIELDS) - set(names)
+        if missing:
+            raise ValueError("Kolom administrasi tidak ditemukan: " + ", ".join(sorted(missing)))
+        geometries, records = [], []
+        for feature in reader.iterShapeRecords():
+            geometry = shape(feature.shape.__geo_interface__)
+            if geometry.is_empty:
+                continue
+            record = dict(zip(names, feature.record))
+            geometries.append(geometry)
+            records.append(record)
+    if not geometries:
+        raise ValueError("Tidak ada polygon yang dapat dibaca dari shapefile")
+    return geometries, records, STRtree(geometries)
+
+
+def candidate_indices(tree: STRtree, point: Point) -> list[int]:
+    """Kompatibel dengan STRtree Shapely 2.x (mengembalikan indeks)."""
+    values = tree.query(point)
+    return [int(value) for value in values]
+
+
+def lookup_address(point: Point, geometries, records, tree) -> tuple[str, str]:
+    """Gunakan covers agar titik tepat pada garis batas tetap terdeteksi.
+
+    Bila lebih dari satu polygon mencakup titik, hasil sengaja tidak dipilih
+    agar alamat tidak keliru. Pengguna dapat meninjau baris tersebut di Log.
+    """
+    matched = [index for index in candidate_indices(tree, point) if geometries[index].covers(point)]
+    if len(matched) == 1:
+        return administrative_address(records[matched[0]]), "OK"
+    if not matched:
+        return "", "TIDAK_DITEMUKAN_DI_BATAS_DATA"
+    return "", "AMBIGU_DI_GARIS_ATAU_OVERLAP_BATAS"
+
+
+def style_workbook(result, log) -> None:
+    fill = PatternFill("solid", fgColor="1F4E78")
+    for ws in (result, log):
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = ws.dimensions
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = fill
+            cell.alignment = Alignment(horizontal="center")
+    for column, width in {"A": 18, "B": 14, "C": 14, "D": 76}.items():
+        result.column_dimensions[column].width = width
+    for column, width in {"A": 14, "B": 18, "C": 14, "D": 14, "E": 38, "F": 62}.items():
+        log.column_dimensions[column].width = width
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Alamat administratif offline dari Excel dan polygon desa")
+    parser.add_argument("input_xlsx", type=Path, help="Excel sumber: bb_id, longitude, latitude")
+    parser.add_argument("boundary_zip", type=Path, help="ZIP shapefile DESA-KECAMATAN JATENG DIY")
+    parser.add_argument("output_xlsx", type=Path, help="Excel hasil")
+    args = parser.parse_args()
+    if not args.input_xlsx.is_file() or not args.boundary_zip.is_file():
+        print("File input Excel atau ZIP batas tidak ditemukan.", file=sys.stderr)
+        return 2
+    if args.input_xlsx.resolve() == args.output_xlsx.resolve():
+        print("Output harus memakai nama yang berbeda dari file sumber.", file=sys.stderr)
+        return 2
+
+    try:
+        geometries, records, tree = load_boundaries(args.boundary_zip)
+        source = load_workbook(args.input_xlsx, read_only=True, data_only=True)
+        source_ws = source[source.sheetnames[0]]
+        columns = spreadsheet_columns(source_ws)
+    except Exception as exc:
+        print(f"Gagal membaca data: {exc}", file=sys.stderr)
+        return 2
+
+    out = Workbook()
+    result = out.active
+    result.title = "Hasil"
+    log = out.create_sheet("Log")
+    result.append(["bb_id", "latitude", "longitude", "alamat"])
+    log.append(["baris_sumber", "bb_id", "latitude", "longitude", "status", "catatan"])
+    counts: dict[str, int] = {}
+
+    for row_number, row in enumerate(source_ws.iter_rows(min_row=2, values_only=True), start=2):
+        bb_id = row[columns["bbid"] - 1]
+        longitude_raw = row[columns["longitude"] - 1]
+        latitude_raw = row[columns["latitude"] - 1]
+        try:
+            longitude, latitude = float(longitude_raw), float(latitude_raw)
+            if not (-180 <= longitude <= 180 and -90 <= latitude <= 90):
+                raise ValueError("koordinat di luar rentang WGS84")
+            address, status = lookup_address(Point(longitude, latitude), geometries, records, tree)
+            note = "" if status == "OK" else "Tinjau koordinat atau kelengkapan polygon batas desa."
+        except (TypeError, ValueError) as exc:
+            address, status, note = "", "KOORDINAT_TIDAK_VALID", str(exc)
+        result.append([bb_id, latitude_raw, longitude_raw, address])
+        log.append([row_number, bb_id, latitude_raw, longitude_raw, status, note])
+        counts[status] = counts.get(status, 0) + 1
+
+    style_workbook(result, log)
+    args.output_xlsx.parent.mkdir(parents=True, exist_ok=True)
+    out.save(args.output_xlsx)
+    print(f"Selesai: {args.output_xlsx}")
+    print(f"Polygon desa/kelurahan dibaca: {len(geometries)}")
+    print("Status:", counts)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

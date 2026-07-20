@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+~$*.xlsx
+.DS_Store
+.vscode/
+.idea/
