@@ -39,7 +39,7 @@ def spreadsheet_columns(ws) -> dict[str, int]:
         for position, cell in enumerate(ws[1], start=1)
         if normalise_header(cell.value)
     }
-    missing = {"bbid", "longitude", "latitude"} - columns.keys()
+    missing = {"orderid", "longitude", "latitude"} - columns.keys()
     if missing:
         raise ValueError("Header wajib tidak ditemukan: " + ", ".join(sorted(missing)))
     return columns
@@ -51,13 +51,27 @@ def title_case(value: object) -> str:
     return text.title() if text.isupper() else text
 
 
-def administrative_address(record: dict[str, object]) -> str:
-    """Buat alamat hanya dari atribut polygon yang memuat titik tersebut."""
+def administrative_address(record: dict[str, object]) -> tuple[str, str, str, str]:
+    """Buat komponen alamat dari atribut polygon yang memuat titik tersebut."""
     desa = title_case(record["DESA_KELUR"])
     kecamatan = title_case(record["KECAMATAN"])
     kab_kota = title_case(record["KAB_KOTA"])
+    
+    upper_kab = kab_kota.upper()
+    stripped_kab = upper_kab
+    if upper_kab.startswith("KABUPATEN "):
+        stripped_kab = upper_kab[10:].strip()
+    elif upper_kab.startswith("KOTA "):
+        stripped_kab = upper_kab[5:].strip()
+        
+    if stripped_kab not in ["MAGELANG", "SEMARANG", "TEGAL", "PEKALONGAN"]:
+        if upper_kab.startswith("KABUPATEN "):
+            kab_kota = kab_kota[10:].strip()
+        elif upper_kab.startswith("KOTA "):
+            kab_kota = kab_kota[5:].strip()
+
     provinsi = title_case(record["PROVINSI"])
-    return f"{desa}, Kec. {kecamatan}, {kab_kota}, {provinsi}"
+    return desa, kecamatan, kab_kota, provinsi
 
 
 def load_boundaries(zip_path: Path):
@@ -100,7 +114,7 @@ def candidate_indices(tree: STRtree, point: Point) -> list[int]:
     return [int(value) for value in values]
 
 
-def lookup_address(point: Point, geometries, records, tree) -> tuple[str, str]:
+def lookup_address(point: Point, geometries, records, tree) -> tuple[tuple[str, str, str, str], str]:
     """Gunakan covers agar titik tepat pada garis batas tetap terdeteksi.
 
     Bila lebih dari satu polygon mencakup titik, hasil sengaja tidak dipilih
@@ -110,8 +124,8 @@ def lookup_address(point: Point, geometries, records, tree) -> tuple[str, str]:
     if len(matched) == 1:
         return administrative_address(records[matched[0]]), "OK"
     if not matched:
-        return "", "TIDAK_DITEMUKAN_DI_BATAS_DATA"
-    return "", "AMBIGU_DI_GARIS_ATAU_OVERLAP_BATAS"
+        return ("", "", "", ""), "TIDAK_DITEMUKAN_DI_BATAS_DATA"
+    return ("", "", "", ""), "AMBIGU_DI_GARIS_ATAU_OVERLAP_BATAS"
 
 
 def style_workbook(result, log) -> None:
@@ -123,66 +137,51 @@ def style_workbook(result, log) -> None:
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = fill
             cell.alignment = Alignment(horizontal="center")
-    for column, width in {"A": 18, "B": 14, "C": 14, "D": 76}.items():
+    for column, width in {"A": 18, "B": 14, "C": 14, "D": 20, "E": 20, "F": 20, "G": 20}.items():
         result.column_dimensions[column].width = width
     for column, width in {"A": 14, "B": 18, "C": 14, "D": 14, "E": 38, "F": 62}.items():
         log.column_dimensions[column].width = width
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Alamat administratif offline dari Excel dan polygon desa")
-    parser.add_argument("input_xlsx", type=Path, help="Excel sumber: bb_id, longitude, latitude")
-    parser.add_argument("boundary_zip", type=Path, help="ZIP shapefile DESA-KECAMATAN JATENG DIY")
-    parser.add_argument("output_xlsx", type=Path, help="Excel hasil")
-    args = parser.parse_args()
-    if not args.input_xlsx.is_file() or not args.boundary_zip.is_file():
-        print("File input Excel atau ZIP batas tidak ditemukan.", file=sys.stderr)
-        return 2
-    if args.input_xlsx.resolve() == args.output_xlsx.resolve():
-        print("Output harus memakai nama yang berbeda dari file sumber.", file=sys.stderr)
-        return 2
+def process_offline(input_xlsx: Path, boundary_zip: Path, output_xlsx: Path) -> dict:
+    if not input_xlsx.is_file() or not boundary_zip.is_file():
+        raise FileNotFoundError("File input Excel atau ZIP batas tidak ditemukan.")
+    if input_xlsx.resolve() == output_xlsx.resolve():
+        raise ValueError("Output harus memakai nama yang berbeda dari file sumber.")
 
     try:
-        geometries, records, tree = load_boundaries(args.boundary_zip)
-        source = load_workbook(args.input_xlsx, read_only=True, data_only=True)
+        geometries, records, tree = load_boundaries(boundary_zip)
+        source = load_workbook(input_xlsx, read_only=True, data_only=True)
         source_ws = source[source.sheetnames[0]]
         columns = spreadsheet_columns(source_ws)
     except Exception as exc:
-        print(f"Gagal membaca data: {exc}", file=sys.stderr)
-        return 2
+        raise RuntimeError(f"Gagal membaca data: {exc}")
 
     out = Workbook()
     result = out.active
     result.title = "Hasil"
     log = out.create_sheet("Log")
-    result.append(["bb_id", "latitude", "longitude", "alamat"])
-    log.append(["baris_sumber", "bb_id", "latitude", "longitude", "status", "catatan"])
+    result.append(["order_id", "latitude", "longitude", "desa", "kecamatan", "kabupaten", "provinsi"])
+    log.append(["baris_sumber", "order_id", "latitude", "longitude", "status", "catatan"])
     counts: dict[str, int] = {}
 
     for row_number, row in enumerate(source_ws.iter_rows(min_row=2, values_only=True), start=2):
-        bb_id = row[columns["bbid"] - 1]
+        bb_id = row[columns["orderid"] - 1]
         longitude_raw = row[columns["longitude"] - 1]
         latitude_raw = row[columns["latitude"] - 1]
         try:
             longitude, latitude = float(longitude_raw), float(latitude_raw)
             if not (-180 <= longitude <= 180 and -90 <= latitude <= 90):
                 raise ValueError("koordinat di luar rentang WGS84")
-            address, status = lookup_address(Point(longitude, latitude), geometries, records, tree)
+            address_tuple, status = lookup_address(Point(longitude, latitude), geometries, records, tree)
             note = "" if status == "OK" else "Tinjau koordinat atau kelengkapan polygon batas desa."
         except (TypeError, ValueError) as exc:
-            address, status, note = "", "KOORDINAT_TIDAK_VALID", str(exc)
-        result.append([bb_id, latitude_raw, longitude_raw, address])
+            address_tuple, status, note = ("", "", "", ""), "KOORDINAT_TIDAK_VALID", str(exc)
+        result.append([bb_id, latitude_raw, longitude_raw, *address_tuple])
         log.append([row_number, bb_id, latitude_raw, longitude_raw, status, note])
         counts[status] = counts.get(status, 0) + 1
 
     style_workbook(result, log)
-    args.output_xlsx.parent.mkdir(parents=True, exist_ok=True)
-    out.save(args.output_xlsx)
-    print(f"Selesai: {args.output_xlsx}")
-    print(f"Polygon desa/kelurahan dibaca: {len(geometries)}")
-    print("Status:", counts)
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    output_xlsx.parent.mkdir(parents=True, exist_ok=True)
+    out.save(output_xlsx)
+    return counts
