@@ -5,7 +5,7 @@ echo =======================================
 
 echo.
 echo [1] Memulai Backend (FastAPI)...
-start "TelOps Backend (FastAPI)" cmd /k "python -m uvicorn api:app --reload"
+start "TelOps Backend (FastAPI)" cmd /k "python -m uvicorn backend.main:app --reload"
 
 echo [2] Memulai Frontend (React/Vite)...
 start "TelOps Frontend (React)" cmd /k "cd frontend && npm run dev"
