@@ -12,3 +12,29 @@ html, body, #root {
   font-family: 'Poppins', sans-serif;
   background-color: #f8fafc;
 }
+.animate-travel-gradient {
+  background-color: #001a3f;
+  overflow: hidden;
+  z-index: 0;
+}
+.animate-travel-gradient::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, transparent 15%, rgba(255, 255, 255, 0.18) 50%, transparent 85%);
+  background-size: 300% 300%;
+  z-index: -1;
+  pointer-events: none;
+  animation: travelGradientLine 12.5s ease-in-out infinite;
+}
+@keyframes travelGradientLine {
+  0% { background-position: 0% 100%; opacity: 0; }
+  10% { opacity: 1; }
+  65% { background-position: 100% 0%; opacity: 1; }
+  75% { background-position: 100% 0%; opacity: 0; }
+  100% { background-position: 0% 100%; opacity: 0; }
+}
+@keyframes ellipsis { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } 100% { content: ''; } } .animate-ellipsis::after { content: ''; animation: ellipsis 1.5s infinite; }

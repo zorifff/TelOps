@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import svgPaths from "../svg-crt6tt6kec";
 
-export default function AutomasiReportODP() {
+export default function AutomasiReportLOP() {
   const [w0File, setW0File] = useState<File | null>(null);
   const [w1File, setW1File] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
@@ -27,7 +27,7 @@ export default function AutomasiReportODP() {
       formData.append("w0_file", w0File);
       formData.append("w1_file", w1File);
       
-      const url = "http://localhost:8000/api/report-odp/generate";
+      const url = "http://localhost:8000/api/report-lop/generate";
 
       const response = await fetch(url, { method: "POST", body: formData });
       if (!response.ok) {
@@ -39,7 +39,7 @@ export default function AutomasiReportODP() {
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = fileName.trim() ? `${fileName.trim()}.xlsx` : `Report_Occupancy_Generated.xlsx`;
+      link.download = fileName.trim() ? `${fileName.trim()}.xlsx` : `Report_LOP_Generated.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -104,7 +104,7 @@ export default function AutomasiReportODP() {
             <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isGuideOpen ? 'max-h-[800px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
                <div className="bg-[#f8fafc] border border-[#cbd5e1] rounded-xl p-6 font-['Poppins'] text-[#344970] text-[14px] leading-relaxed">
                   <p className="mb-4">
-                    Agar sistem dapat menghitung data Occupancy dengan benar, pastikan file Excel yang Anda unggah memenuhi kriteria berikut:
+                    Agar sistem dapat menghitung data Report LOP dengan tepat, pastikan file Excel yang Anda unggah memenuhi kriteria berikut:
                   </p>
                   
                   <div className="mb-6">
@@ -114,11 +114,14 @@ export default function AutomasiReportODP() {
                     </h4>
                     <ul className="list-disc pl-6 space-y-2">
                       <li>Wajib memiliki sheet: <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">ODP Golive 2026</code></li>
-                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">WOK</code> (untuk pengelompokan wilayah)</li>
-                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Type Design</code> (Sistem hanya membaca baris bernilai "GREENFIELD")</li>
-                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Port Terbangun</code></li>
-                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Used_new_v3</code></li>
+                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Type Design</code> (Hanya membaca GREENFIELD)</li>
+                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Nama Proyek</code></li>
+                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Telkomsel Branch</code></li>
+                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">WOK</code></li>
                       <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Cat Durasi Go Live</code></li>
+                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">ODP NAME</code> (Untuk menghitung jumlah ODP)</li>
+                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Port Terbangun</code></li>
+                      <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Used_new_v3</code> atau <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Used_new_v2</code></li>
                     </ul>
                   </div>
 
@@ -128,7 +131,7 @@ export default function AutomasiReportODP() {
                       2. File W-1 (Laporan Minggu Lalu)
                     </h4>
                     <ul className="list-disc pl-6 space-y-2">
-                      <li>Wajib memiliki sheet: <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">Table Report</code></li>
+                      <li>Wajib memiliki sheet: <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">Report per LOP</code></li>
                     </ul>
                   </div>
                </div>
@@ -149,7 +152,7 @@ export default function AutomasiReportODP() {
               type="text" 
               value={fileName}
               onChange={(e) => setFileName(e.target.value)}
-              placeholder="Contoh: Report_ODP_Minggu_1"
+              placeholder="Contoh: Report_LOP_September"
               className="w-full border border-[#cbd5e1] rounded-[8px] px-4 py-3 font-['Poppins'] text-[14px] text-[#001a3f] outline-none focus:border-[#ee2e24] transition-colors"
             />
           </div>
@@ -179,7 +182,6 @@ export default function AutomasiReportODP() {
            {status.endsWith("...") && <span className="animate-ellipsis"></span>}
         </div>
       </div>
-
     </div>
   );
 }
