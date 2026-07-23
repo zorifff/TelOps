@@ -4,11 +4,26 @@ Aplikasi web TelOps untuk manajemen dan automasi report ODP. Terdiri dari *backe
 
 ## Persyaratan Sistem (Prerequisites)
 
-Sebelum dapat menjalankan aplikasi ini, pastikan komputer Anda sudah terinstall:
+Sebelum dapat menjalankan aplikasi ini, pastikan komputer Anda sudah memiliki Python dan Node.js. 
 
-1. **Python** (Versi 3.8 atau lebih baru) - [Download Python](https://www.python.org/downloads/)
-   - *Pastikan opsi "Add Python to PATH" dicentang saat instalasi.*
-2. **Node.js** (Versi 18 atau lebih baru disarankan) - [Download Node.js](https://nodejs.org/)
+**Cara Cepat Install via CMD / Terminal (Rekomendasi):**
+Jika Anda belum menginstalnya, Anda bisa menginstalnya langsung melalui terminal tanpa harus mendownload manual lewat browser:
+
+- **Pengguna Windows (Buka CMD / PowerShell):**
+  ```cmd
+  winget install -e --id Python.Python.3.11
+  winget install -e --id OpenJS.NodeJS
+  ```
+- **Pengguna macOS (Buka Terminal, pastikan memiliki Homebrew):**
+  ```bash
+  brew install python node
+  ```
+
+> **Catatan Penting & Aman:** Jika komputer Anda ternyata **sudah pernah terinstall** Python atau Node.js, menjalankan perintah di atas **TIDAK AKAN** menyebabkan error, tidak akan merusak aplikasi, dan tidak akan membuat web ini gagal dibuka di local. Sistem secara otomatis hanya akan mengabaikannya atau sekadar memperbarui ke versi yang lebih baru secara aman.
+
+**Cara Install Manual (Alternatif Jika Cara di Atas Gagal):**
+1. **Python** - [Download Manual](https://www.python.org/downloads/) *(Pastikan opsi "Add Python to PATH" dicentang)*
+2. **Node.js** - [Download Manual](https://nodejs.org/)
 
 ---
 
