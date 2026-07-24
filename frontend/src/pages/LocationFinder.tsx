@@ -26,7 +26,7 @@ export default function LocationFinder() {
       const formData = new FormData();
       formData.append("input_file", excelFile);
       
-      let url = "http://localhost:8000/api/geocode/offline";
+      let url = "/api/geocode/offline";
       if (method === "offline") {
           // No additional logic needed for offline
       } else {
@@ -36,7 +36,7 @@ export default function LocationFinder() {
             return;
          }
          formData.append("api_key", apiKey);
-         url = "http://localhost:8000/api/geocode/online";
+         url = "/api/geocode/online";
       }
 
       const response = await fetch(url, { method: "POST", body: formData });

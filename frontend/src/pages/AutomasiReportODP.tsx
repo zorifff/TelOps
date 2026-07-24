@@ -27,7 +27,7 @@ export default function AutomasiReportODP() {
       formData.append("w0_file", w0File);
       formData.append("w1_file", w1File);
       
-      const url = "http://localhost:8000/api/report-odp/generate";
+      const url = "/api/report-odp/generate";
 
       const response = await fetch(url, { method: "POST", body: formData });
       if (!response.ok) {
