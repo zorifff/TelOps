@@ -143,6 +143,15 @@ def style_workbook(result, log, num_original_cols: int) -> None:
             cell.alignment = Alignment(horizontal="center")
 
 
+_cached_boundaries = None
+
+def get_cached_boundaries(zip_path: Path):
+    global _cached_boundaries
+    if _cached_boundaries is None:
+        _cached_boundaries = load_boundaries(zip_path)
+    return _cached_boundaries
+
+
 def process_offline(input_xlsx: Path, boundary_zip: Path, output_xlsx: Path) -> dict:
     if not input_xlsx.is_file() or not boundary_zip.is_file():
         raise FileNotFoundError("File input Excel atau ZIP batas tidak ditemukan.")
@@ -150,7 +159,7 @@ def process_offline(input_xlsx: Path, boundary_zip: Path, output_xlsx: Path) -> 
         raise ValueError("Output harus memakai nama yang berbeda dari file sumber.")
 
     try:
-        geometries, records, tree = load_boundaries(boundary_zip)
+        geometries, records, tree = get_cached_boundaries(boundary_zip)
         source = load_workbook(input_xlsx, read_only=True, data_only=True)
         source_ws = source[source.sheetnames[0]]
         lat_col, lng_col, headers = find_lat_lng_cols(source_ws)
