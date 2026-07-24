@@ -27,7 +27,7 @@ export default function App() {
             onClick={() => setActiveTab("home")}
           >
             <div className="h-[32px] w-[32px] relative">
-              <img src="/telkomsel-logo.png" alt="Telkomsel Logo" className="absolute block inset-0 size-full object-contain" />
+              <img src="/telkomsel-logo.svg" alt="Telkomsel Logo" className="absolute block inset-0 size-full object-contain" />
             </div>
             <div className="font-['Poppins'] font-bold text-[24px] text-[#ec0013]">
               TelOps
