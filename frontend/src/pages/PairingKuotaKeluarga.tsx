@@ -154,8 +154,8 @@ export default function PairingKuotaKeluarga() {
         <FileUploader
           label="Pilih atau tarik berkas Excel Data Pairing (.xlsx / .xls)"
           file={file}
-          onFileSelect={(f) => setFile(f)}
-          onClear={() => setFile(null)}
+          setFile={setFile}
+          accept=".xlsx,.xls"
           inputRef={fileInputRef}
         />
       </div>
