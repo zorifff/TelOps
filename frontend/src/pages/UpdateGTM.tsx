@@ -3,50 +3,39 @@ import svgPaths from "../svg-crt6tt6kec";
 import FileUploader from "../components/FileUploader";
 import { saveFileWithPicker } from "../utils/fileSaver";
 
-export default function LocationFinder() {
-  const [method, setMethod] = useState<"offline" | "online">("offline");
-  const [excelFile, setExcelFile] = useState<File | null>(null);
+export default function UpdateGTM() {
+  const [w0File, setW0File] = useState<File | null>(null);
+  const [w1File, setW1File] = useState<File | null>(null);
 
-  const [apiKey, setApiKey] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
-  const excelInputRef = useRef<HTMLInputElement>(null);
+  const w0InputRef = useRef<HTMLInputElement>(null);
+  const w1InputRef = useRef<HTMLInputElement>(null);
 
   const handleProcess = async () => {
-    if (!excelFile) {
-        alert("Harap unggah file Excel sumber.");
-        return;
+    if (!w0File || !w1File) {
+      alert("Harap unggah file Raw Data W-0 (Terbaru) dan File W-1 (Minggu Lalu).");
+      return;
     }
-    
+
     setIsProcessing(true);
 
     try {
       const formData = new FormData();
-      formData.append("input_file", excelFile);
-      
-      let url = "/api/geocode/offline";
-      if (method === "offline") {
-          // No additional logic needed for offline
-      } else {
-         if (!apiKey) {
-            alert("Harap masukkan Google Maps API Key.");
-            setIsProcessing(false);
-            return;
-         }
-         formData.append("api_key", apiKey);
-         url = "/api/geocode/online";
-      }
+      formData.append("w0_file", w0File);
+      formData.append("w1_file", w1File);
+
+      const url = "/api/update-gtm/generate";
 
       const response = await fetch(url, { method: "POST", body: formData });
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.detail || "Terjadi kesalahan pada server");
       }
-      
+
       const blob = await response.blob();
-      const defaultName = excelFile ? `hasil_${excelFile.name}` : "Hasil_Location_Finder.xlsx";
-      await saveFileWithPicker(blob, defaultName);
+      await saveFileWithPicker(blob, "Update_GTM_Requirement_Generated.xlsx");
     } catch (e: any) {
       if (e.message !== 'Penyimpanan file dibatalkan oleh pengguna.' && e.name !== 'AbortError') {
         alert(`Error: ${e.message}`);
@@ -65,8 +54,10 @@ export default function LocationFinder() {
         {/* Card Header */}
         <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex flex-col">
-            <h2 className="text-[20px] font-bold text-[#001a3f] m-0">Location Finder</h2>
-            <span className="text-[13px] text-slate-500 font-medium">Petakan koordinat Lintang & Bujur menjadi data wilayah lengkap (Jateng & DIY)</span>
+            <h2 className="text-[20px] font-bold text-[#001a3f] m-0">Fitur Update GTM</h2>
+            <span className="text-[13px] text-slate-500 font-medium">
+              Memproses file laporan Excel untuk diunggah ke website GTM guna memperbarui data sistem.
+            </span>
           </div>
 
           <button 
@@ -87,25 +78,37 @@ export default function LocationFinder() {
         {isGuideOpen && (
           <div className="px-8 py-5 bg-slate-50 border-b border-slate-200">
             <div className="bg-[#f8fafc] border border-[#cbd5e1] rounded-xl p-6 font-['Poppins'] text-[#344970] text-[14px] leading-relaxed shadow-sm">
-              <p className="mb-4">
-                Agar sistem dapat melakukan pelacakan wilayah administratif (reverse geocoding) dengan akurat, pastikan file Excel yang Anda unggah memenuhi kriteria berikut:
+              <p className="mb-4 font-normal text-[#344970]">
+                Agar sistem dapat menghasilkan file Update GTM dengan presisi, pastikan file Excel yang Anda unggah memenuhi kriteria berikut:
               </p>
               
-              <div className="mb-2">
+              <div className="mb-6">
                 <h4 className="font-bold text-[#001a3f] text-[16px] mb-2 flex items-center gap-2">
-                  File Excel Bebas (Raw Data)
+                  1. File W-0 (Raw Data Terbaru)
                 </h4>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>Sistem dapat membaca nama sheet apapun secara bebas (sistem otomatis akan memproses sheet pertama).</li>
-                  <li>Wajib memiliki kolom koordinat Lintang, dengan nama header (bebas huruf besar/kecil): <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">latitude</code> atau <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">lat</code></li>
-                  <li>Wajib memiliki kolom koordinat Bujur, dengan nama header (bebas huruf besar/kecil): <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">longitude</code>, <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">long</code>, atau <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">lng</code></li>
+                  <li>Wajib memiliki sheet: <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">ODP Golive 2026</code> (atau sheet raw data ODP)</li>
+                  <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Telkomsel Branch</code></li>
+                  <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">WOK</code></li>
+                  <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Nama Proyek</code></li>
+                  <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">ODP NAME</code></li>
+                  <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">LATITUDE</code> & <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">LONGITUDE</code></li>
+                  <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">OCC 2</code></li>
+                  <li>Wajib memiliki kolom: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Type Design</code> (Greenfield / Brownfield)</li>
+                  <li>Wajib memiliki kolom Used: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Used_new_v3</code>, <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Used_new_v2</code>, atau <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Used</code></li>
+                  <li>Wajib memiliki kolom Total Port: <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Port Terbangun</code> atau <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Total</code></li>
                 </ul>
               </div>
-              
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r mt-6">
-                <p className="text-blue-800 text-[13px] m-0">
-                  <strong>Catatan:</strong> Pastikan format angka koordinat di dalam file sesuai standar desimal WGS84 (contoh: <code>-7.12345</code>, <code>110.12345</code>).
-                </p>
+
+              <div>
+                <h4 className="font-bold text-[#001a3f] text-[16px] mb-2 flex items-center gap-2">
+                  2. File W-1 (Data / Laporan Minggu Lalu)
+                </h4>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Dapat berupa <b>File Output Laporan Occupancy</b> (yang memiliki sheet <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">Report - Occupancy</code>), atau</li>
+                  <li>Dapat berupa <b>File Raw Data Minggu Lalu</b> (yang memiliki sheet <code className="bg-gray-200 text-[#ee2e24] px-1.5 py-0.5 rounded font-mono text-[13px]">ODP Golive 2026</code>).</li>
+                  <li>Digunakan untuk kalkulasi perbandingan persentase <code className="bg-gray-200 px-1.5 py-0.5 rounded font-mono text-[13px]">Gap WoW</code> per Branch dan regional Jateng DIY.</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -113,8 +116,9 @@ export default function LocationFinder() {
 
         {/* Form Workstation Content */}
         <div className="p-8 flex flex-col gap-8">
-          <div className="w-full">
-            <FileUploader label="Raw Data" file={excelFile} inputRef={excelInputRef} setFile={setExcelFile} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+            <FileUploader label="1. File W-0 (Raw Data Terbaru)" file={w0File} inputRef={w0InputRef} setFile={setW0File} />
+            <FileUploader label="2. File W-1 (File Laporan Minggu Lalu)" file={w1File} inputRef={w1InputRef} setFile={setW1File} />
           </div>
 
           <button 
@@ -128,14 +132,14 @@ export default function LocationFinder() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>MEMPROSES LOKASI GEOCODING...</span>
+                <span>MEMPROSES UPDATE GTM...</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <svg className="w-6 h-6" viewBox="0 0 24 24">
                   <path d={svgPaths.p30eba500} fill="white" />
                 </svg>
-                <span>JALANKAN PROGRAM</span>
+                <span>MULAI</span>
               </div>
             )}
           </button>

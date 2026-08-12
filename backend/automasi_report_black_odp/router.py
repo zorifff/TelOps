@@ -1,7 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from .generate_report_black import generate_report_black
@@ -10,6 +10,7 @@ router = APIRouter()
 
 @router.post("/generate")
 async def generate_odp_black_report(
+    type_design: str = Query("GREENFIELD", description="Type Design: GREENFIELD, BROWNFIELD, ALL, or COMBINED"),
     w0_file: UploadFile = File(...),
     w1_file: UploadFile = File(...)
 ):
@@ -29,15 +30,26 @@ async def generate_odp_black_report(
         if not template_path.exists():
             raise HTTPException(status_code=500, detail="File Template_Report_Black.xlsx tidak ditemukan di server.")
 
-        # Output path
-        output_path = w0_path.with_name(f"Report_Black_ODP_Generated.xlsx")
+        td_clean = type_design.strip().upper()
+        if td_clean in ('COMBINED', 'COMBINED_ALL', 'ALL_TABLES', '3_TABLES'):
+            out_label = "Combined_3_Tables"
+        elif td_clean in ('ALL', 'ALL TYPE', 'ALL TYPE DESIGN'):
+            out_label = "All_Type_Design"
+        elif td_clean == 'BROWNFIELD':
+            out_label = "Brownfield"
+        else:
+            out_label = "Greenfield"
+
+        out_name = f"Report_Black_ODP_{out_label}.xlsx"
+        output_path = w0_path.with_name(out_name)
 
         # Call the generate function
         generate_report_black(
             w0_path=str(w0_path),
             w1_path=str(w1_path),
             out_path=str(output_path),
-            template_path=str(template_path)
+            template_path=str(template_path),
+            td_filter=td_clean
         )
 
         # Clean up input files
@@ -52,7 +64,7 @@ async def generate_odp_black_report(
 
         return FileResponse(
             path=output_path,
-            filename="Report_Black_ODP_Generated.xlsx",
+            filename=out_name,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     except Exception as e:

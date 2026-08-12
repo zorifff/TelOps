@@ -1,7 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from .generate_report import generate_report
@@ -10,6 +10,7 @@ router = APIRouter()
 
 @router.post("/generate")
 async def generate_odp_report(
+    type_design: str = Query("COMBINED", description="Type Design: GREENFIELD, BROWNFIELD, ALL, or COMBINED"),
     w0_file: UploadFile = File(...),
     w1_file: UploadFile = File(...)
 ):
@@ -29,19 +30,29 @@ async def generate_odp_report(
         if not template_path.exists():
             raise HTTPException(status_code=500, detail="File Template_Report.xlsx tidak ditemukan di server.")
 
-        # Output path
-        output_path = w0_path.with_name(f"Report_Occupancy_Generated.xlsx")
+        td_clean = type_design.strip().upper()
+        if td_clean in ('COMBINED', 'COMBINED_ALL', 'ALL_TABLES', '3_TABLES'):
+            out_label = "Combined_3_Tables"
+        elif td_clean in ('ALL', 'ALL TYPE', 'ALL TYPE DESIGN'):
+            out_label = "All_Type_Design"
+        elif td_clean == 'BROWNFIELD':
+            out_label = "Brownfield"
+        else:
+            out_label = "Greenfield"
+
+        out_name = f"Report_Occupancy_{out_label}.xlsx"
+        output_path = w0_path.with_name(out_name)
 
         # Call the generate function
-        # Default sheet names used in generate_report arg parser
         generate_report(
             file_w0=str(w0_path),
             file_w1=str(w1_path),
             output_file=str(output_path),
             template_file=str(template_path),
-            sheet_w1_report="Table Report",
+            sheet_w1_report="Report - Occupancy",
             sheet_w0_raw="ODP Golive 2026",
-            sheet_w0_template="Report - Occupancy"
+            sheet_w0_template="Report - Occupancy",
+            td_filter=td_clean
         )
 
         # Clean up input files
@@ -56,7 +67,7 @@ async def generate_odp_report(
 
         return FileResponse(
             path=output_path,
-            filename="Report_Occupancy_Generated.xlsx",
+            filename=out_name,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     except Exception as e:

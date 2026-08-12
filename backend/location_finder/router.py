@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
@@ -18,8 +19,15 @@ async def geocode_offline(
             tmp_in.write(await input_file.read())
             input_path = Path(tmp_in.name)
 
-        # File batas wilayah
-        zip_path = Path(__file__).parent / "DESA-KECAMATAN JATENG DIY.zip"
+        # File batas wilayah (support PyInstaller _MEIPASS & standard module pathing)
+        base_dir = getattr(sys, '_MEIPASS', None)
+        if base_dir:
+            zip_path = Path(base_dir) / "backend" / "location_finder" / "DESA-KECAMATAN JATENG DIY.zip"
+        else:
+            zip_path = Path(__file__).parent / "DESA-KECAMATAN JATENG DIY.zip"
+
+        if not zip_path.exists():
+            zip_path = Path(__file__).parent / "DESA-KECAMATAN JATENG DIY.zip"
 
         output_path = input_path.with_name(f"hasil_offline_{input_file.filename}")
 

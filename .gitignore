@@ -4,3 +4,11 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
+build/
+dist/
+Output/
+temp_*.xlsx
+test_*.xlsx
+tmp_*.xlsx
+frontend/node_modules/
+frontend/dist/

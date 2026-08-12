@@ -45,7 +45,7 @@ def find_lat_lng_cols(ws) -> tuple[int, int, list[str]]:
             lng_col = i
             
     if lat_col == -1 or lng_col == -1:
-        raise ValueError("Kolom Latitude/Lat dan Longitude/Lng/Long wajib ada.")
+        raise ValueError("Berkas Excel Raw Data wajib memiliki kolom koordinat 'latitude' / 'lat' dan 'longitude' / 'long' / 'lng'. Harap sesuaikan dengan panduan file.")
     return lat_col, lng_col, headers
 
 
