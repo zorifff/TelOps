@@ -57,6 +57,16 @@ export default function Home({ setActiveTab }: HomeProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       )
+    },
+    {
+      id: "pairing_kuota_keluarga",
+      title: "Pairing Kuota Keluarga",
+      description: "Restrukturisasi data pairing Telkomsel One / Kuota Keluarga dari 1:M (Long) menjadi 1:1 (Wide) dengan sanitasi MSISDN presisi.",
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-[#ee2e24]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      )
     }
   ];
 

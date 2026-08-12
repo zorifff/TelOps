@@ -4,11 +4,12 @@ import AutomasiReportODP from "./pages/AutomasiReportODP";
 import AutomasiReportBlackODP from "./pages/AutomasiReportBlackODP";
 import AutomasiReportLOP from "./pages/AutomasiReportLOP";
 import UpdateGTM from "./pages/UpdateGTM";
+import PairingKuotaKeluarga from "./pages/PairingKuotaKeluarga";
 import Home from "./pages/Home";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<
-    "home" | "location_finder" | "automasi_report_odp" | "automasi_report_black_odp" | "automasi_report_lop" | "update_gtm"
+    "home" | "location_finder" | "automasi_report_odp" | "automasi_report_black_odp" | "automasi_report_lop" | "update_gtm" | "pairing_kuota_keluarga"
   >("home");
 
   useEffect(() => {
@@ -89,6 +90,16 @@ export default function App() {
         </svg>
       )
     },
+    {
+      id: "pairing_kuota_keluarga",
+      label: "Pairing Kuota Keluarga",
+      category: "Fitur Utas",
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      )
+    },
   ];
 
   const getTitle = () => {
@@ -99,6 +110,7 @@ export default function App() {
       case "automasi_report_black_odp": return "Automasi Report Black ODP";
       case "automasi_report_lop": return "Automasi Report LOP Greenfield";
       case "update_gtm": return "Update GTM Requirement";
+      case "pairing_kuota_keluarga": return "Pairing Kuota Keluarga";
       default: return "TelOps Management";
     }
   };
@@ -186,6 +198,7 @@ export default function App() {
             {activeTab === 'automasi_report_black_odp' && <AutomasiReportBlackODP />}
             {activeTab === 'automasi_report_lop' && <AutomasiReportLOP />}
             {activeTab === 'update_gtm' && <UpdateGTM />}
+            {activeTab === 'pairing_kuota_keluarga' && <PairingKuotaKeluarga />}
           </div>
         </main>
 

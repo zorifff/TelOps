@@ -11,6 +11,7 @@ from backend.automasi_report_odp.router import router as report_odp_router
 from backend.automasi_report_black_odp.router import router as report_black_odp_router
 from backend.automasi_report_lop.router import router as report_lop_router
 from backend.update_gtm.router import router as update_gtm_router
+from backend.pairing_kuota_keluarga.router import router as pairing_router
 
 app = FastAPI(title="TelOps API")
 
@@ -27,6 +28,7 @@ app.include_router(report_odp_router, prefix="/api/report-odp")
 app.include_router(report_black_odp_router, prefix="/api/report-black-odp")
 app.include_router(report_lop_router, prefix="/api/report-lop")
 app.include_router(update_gtm_router, prefix="/api/update-gtm")
+app.include_router(pairing_router, prefix="/api/pairing-kuota-keluarga")
 
 # Determine base directory (PyInstaller frozen mode support)
 if getattr(sys, 'frozen', False):
